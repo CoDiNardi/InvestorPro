@@ -70,14 +70,16 @@ function normalizeCvmCode(value: string | undefined) {
 }
 
 function parseNumber(value: string | undefined) {
-  const cleaned = String(value ?? "")
-    .trim()
-    .replace(/\./g, "")
-    .replace(",", ".");
+  const raw = String(value ?? "").trim();
 
-  if (!cleaned) return null;
+  if (!raw) return null;
 
-  const number = Number(cleaned);
+  // CVM DFP numeric fields normally use dot as decimal separator:
+  // 200333000.0000000000
+  // Do not remove dots here.
+  const normalized = raw.replace(",", ".");
+
+  const number = Number(normalized);
 
   return Number.isFinite(number) ? number : null;
 }
@@ -302,3 +304,4 @@ export async function POST() {
     );
   }
 }
+
