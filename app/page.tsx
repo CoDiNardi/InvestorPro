@@ -346,6 +346,8 @@ export default function Home() {
   const [updatingDetails, setUpdatingDetails] = useState(false);
   const [updatingSecurities, setUpdatingSecurities] = useState(false);
   const [importingCotahistPrices, setImportingCotahistPrices] = useState(false);
+  const [importingFreShares, setImportingFreShares] = useState(false);
+  const [importingDfpFundamentals, setImportingDfpFundamentals] = useState(false);
   const [recalculatingValuations, setRecalculatingValuations] = useState(false);
   const [error, setError] = useState("");
   const [now, setNow] = useState(new Date());
@@ -519,6 +521,50 @@ export default function Home() {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setImportingCotahistPrices(false);
+    }
+  }
+
+  async function importFreShares() {
+    try {
+      setImportingFreShares(true);
+      setError("");
+
+      const response = await fetch("/api/markets/b3/shares/import-cvm-fre", {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to import CVM FRE shares");
+      }
+
+      await Promise.all([loadShares(), loadCoverage()]);
+      setNow(new Date());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setImportingFreShares(false);
+    }
+  }
+
+  async function importDfpFundamentals() {
+    try {
+      setImportingDfpFundamentals(true);
+      setError("");
+
+      const response = await fetch("/api/markets/b3/fundamentals/import-cvm-dfp", {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to import CVM DFP fundamentals");
+      }
+
+      await Promise.all([loadFundamentals(), loadCoverage()]);
+      setNow(new Date());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setImportingDfpFundamentals(false);
     }
   }
 
@@ -1120,7 +1166,7 @@ export default function Home() {
               Prices from CSV are imported automatically when the app loads prices.
             </p>
 
-            <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+            <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <button
                 onClick={updateCompanies}
                 disabled={updatingCompanies}
@@ -1153,6 +1199,26 @@ export default function Home() {
                 {importingCotahistPrices
                   ? "Importing COTAHIST..."
                   : "Import COTAHIST prices"}
+              </button>
+
+              <button
+                onClick={importFreShares}
+                disabled={importingFreShares}
+                className="rounded-xl bg-cyan-600 px-5 py-3 font-semibold text-white hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {importingFreShares
+                  ? "Importing FRE shares..."
+                  : "Import CVM FRE shares"}
+              </button>
+
+              <button
+                onClick={importDfpFundamentals}
+                disabled={importingDfpFundamentals}
+                className="rounded-xl bg-indigo-600 px-5 py-3 font-semibold text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {importingDfpFundamentals
+                  ? "Importing DFP fundamentals..."
+                  : "Import CVM DFP fundamentals"}
               </button>
 
               <button
@@ -1645,6 +1711,10 @@ export default function Home() {
     </main>
   );
 }
+
+
+
+
 
 
 
