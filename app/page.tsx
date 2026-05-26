@@ -1110,6 +1110,22 @@ export default function Home() {
               <p className="mt-1 text-sm text-slate-400">
                 Shows which data layers are still missing before companies can be valued.
               </p>
+
+              <div className="mt-4 flex flex-wrap gap-3">
+                <a
+                  href="/api/markets/b3/coverage/missing-prices.csv"
+                  className="rounded-xl border border-slate-700 bg-slate-950 px-4 py-2 text-sm font-semibold text-slate-100 hover:bg-slate-800"
+                >
+                  Export missing prices CSV
+                </a>
+
+                <a
+                  href="/api/markets/b3/coverage/missing-shares.csv"
+                  className="rounded-xl border border-slate-700 bg-slate-950 px-4 py-2 text-sm font-semibold text-slate-100 hover:bg-slate-800"
+                >
+                  Export missing shares CSV
+                </a>
+              </div>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
@@ -1556,6 +1572,7 @@ export default function Home() {
     </main>
   );
 }
+
 
 
 
