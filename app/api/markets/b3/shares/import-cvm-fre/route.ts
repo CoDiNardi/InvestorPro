@@ -28,6 +28,7 @@ type ShareRow = ExistingShareRow & {
   tradingName?: string;
   companyName?: string;
   shareClass?: string;
+  freYear?: number;
 };
 
 type FreCompanyRow = {
@@ -35,6 +36,7 @@ type FreCompanyRow = {
   codeCVM: string;
   companyName: string;
   documentId: string;
+  year: number;
 };
 
 type FreCapitalRow = {
@@ -45,19 +47,14 @@ type FreCapitalRow = {
   ordinaryShares: number;
   preferredShares: number;
   totalShares: number;
+  year: number;
 };
 
 const B3_DIR = path.join(process.cwd(), "data", "markets", "b3");
-const FRE_DIR = path.join(B3_DIR, "cvm", "fre", "extracted", "2026");
+const FRE_EXTRACTED_DIR = path.join(B3_DIR, "cvm", "fre", "extracted");
 
 const SECURITIES_FILE = path.join(B3_DIR, "securities.json");
 const SHARES_FILE = path.join(B3_DIR, "shares.json");
-
-const FRE_MAIN_FILE = path.join(FRE_DIR, "fre_cia_aberta_2026.csv");
-const FRE_CAPITAL_FILE = path.join(
-  FRE_DIR,
-  "fre_cia_aberta_capital_social_2026.csv"
-);
 
 async function readJsonOrDefault(filePath: string, fallback: unknown) {
   try {
@@ -65,6 +62,15 @@ async function readJsonOrDefault(filePath: string, fallback: unknown) {
     return JSON.parse(file);
   } catch {
     return fallback;
+  }
+}
+
+async function fileExists(filePath: string) {
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -108,6 +114,15 @@ function normalizeCvmCode(value: string | undefined) {
   return String(Number(digits));
 }
 
+function findHeaderIndex(header: string[], names: string[]) {
+  for (const name of names) {
+    const index = header.indexOf(name);
+    if (index !== -1) return index;
+  }
+
+  return -1;
+}
+
 async function readSemicolonCsv(filePath: string) {
   const file = await fs.readFile(filePath, "latin1");
 
@@ -132,17 +147,25 @@ function groupSecuritiesByCodeCVM(securities: SecurityRow[]) {
   return map;
 }
 
-function findHeaderIndex(header: string[], names: string[]) {
-  for (const name of names) {
-    const index = header.indexOf(name);
-    if (index !== -1) return index;
-  }
+async function getAvailableFreYears() {
+  const entries = await fs.readdir(FRE_EXTRACTED_DIR, { withFileTypes: true });
 
-  return -1;
+  return entries
+    .filter((entry) => entry.isDirectory() && /^\d{4}$/.test(entry.name))
+    .map((entry) => Number(entry.name))
+    .sort((a, b) => b - a);
 }
 
-async function readFreCompanies() {
-  const rows = await readSemicolonCsv(FRE_MAIN_FILE);
+async function readFreCompanies(year: number) {
+  const filePath = path.join(
+    FRE_EXTRACTED_DIR,
+    String(year),
+    `fre_cia_aberta_${year}.csv`
+  );
+
+  if (!(await fileExists(filePath))) return [];
+
+  const rows = await readSemicolonCsv(filePath);
   const header = rows[0];
 
   const cnpjIndex = findHeaderIndex(header, ["CNPJ_CIA", "CNPJ_Companhia"]);
@@ -156,9 +179,7 @@ async function readFreCompanies() {
     codeCvmIndex === -1 ||
     documentIdIndex === -1
   ) {
-    throw new Error(
-      `Unexpected FRE main CSV header: ${header.join(";")}`
-    );
+    throw new Error(`Unexpected FRE main CSV header for ${year}: ${header.join(";")}`);
   }
 
   const companies: FreCompanyRow[] = [];
@@ -174,19 +195,28 @@ async function readFreCompanies() {
       codeCVM,
       companyName: columns[companyNameIndex] ?? "",
       documentId: columns[documentIdIndex] ?? "",
+      year,
     });
   }
 
   return companies;
 }
 
-async function readFreCapitalRows() {
-  const rows = await readSemicolonCsv(FRE_CAPITAL_FILE);
+async function readFreCapitalRows(year: number) {
+  const filePath = path.join(
+    FRE_EXTRACTED_DIR,
+    String(year),
+    `fre_cia_aberta_capital_social_${year}.csv`
+  );
+
+  if (!(await fileExists(filePath))) return [];
+
+  const rows = await readSemicolonCsv(filePath);
   const header = rows[0];
 
-  const cnpjIndex = header.indexOf("CNPJ_Companhia");
-  const documentIdIndex = header.indexOf("ID_Documento");
-  const companyNameIndex = header.indexOf("Nome_Companhia");
+  const cnpjIndex = findHeaderIndex(header, ["CNPJ_Companhia", "CNPJ_CIA"]);
+  const documentIdIndex = findHeaderIndex(header, ["ID_Documento", "ID_DOC"]);
+  const companyNameIndex = findHeaderIndex(header, ["Nome_Companhia", "DENOM_CIA"]);
   const capitalTypeIndex = header.indexOf("Tipo_Capital");
   const ordinaryIndex = header.indexOf("Quantidade_Acoes_Ordinarias");
   const preferredIndex = header.indexOf("Quantidade_Acoes_Preferenciais");
@@ -201,7 +231,9 @@ async function readFreCapitalRows() {
     preferredIndex === -1 ||
     totalIndex === -1
   ) {
-    throw new Error("Unexpected FRE capital social CSV header");
+    throw new Error(
+      `Unexpected FRE capital social CSV header for ${year}: ${header.join(";")}`
+    );
   }
 
   const capitalRows: FreCapitalRow[] = [];
@@ -219,6 +251,7 @@ async function readFreCapitalRows() {
       ordinaryShares: parseNumber(columns[ordinaryIndex]),
       preferredShares: parseNumber(columns[preferredIndex]),
       totalShares: parseNumber(columns[totalIndex]),
+      year,
     });
   }
 
@@ -256,7 +289,8 @@ function buildRowsForCompany(args: {
       sharesOutstanding: capital.ordinaryShares,
       source: "cvm_fre_capital_social",
       updatedAt: now,
-      note: "Mapped from FRE Capital Emitido / Quantidade_Acoes_Ordinarias.",
+      freYear: capital.year,
+      note: `Mapped from FRE ${capital.year} Capital Emitido / Quantidade_Acoes_Ordinarias.`,
     });
   }
 
@@ -273,7 +307,8 @@ function buildRowsForCompany(args: {
       sharesOutstanding: capital.preferredShares,
       source: "cvm_fre_capital_social",
       updatedAt: now,
-      note: "Mapped from FRE Capital Emitido / Quantidade_Acoes_Preferenciais.",
+      freYear: capital.year,
+      note: `Mapped from FRE ${capital.year} Capital Emitido / Quantidade_Acoes_Preferenciais.`,
     });
   }
 
@@ -297,7 +332,8 @@ function buildRowsForCompany(args: {
       sharesOutstanding: capital.totalShares,
       source: "cvm_fre_capital_social",
       updatedAt: now,
-      note: "ON-only fallback mapped from FRE Quantidade_Total_Acoes.",
+      freYear: capital.year,
+      note: `ON-only fallback mapped from FRE ${capital.year} Quantidade_Total_Acoes.`,
     });
   }
 
@@ -339,20 +375,29 @@ export async function POST() {
     const securities: SecurityRow[] = securitiesCache.securities ?? [];
     const existingShares: ExistingShareRow[] = existingSharesCache.shares ?? [];
 
-    const freCompanies = await readFreCompanies();
-    const freCapitalRows = await readFreCapitalRows();
-
-    const freCompanyByCnpj = new Map(
-      freCompanies.map((company) => [company.cnpj, company])
-    );
+    const years = await getAvailableFreYears();
 
     const capitalByCodeCVM = new Map<string, FreCapitalRow>();
+    const freYearsUsed = new Set<number>();
 
-    for (const capital of freCapitalRows) {
-      const company = freCompanyByCnpj.get(capital.cnpj);
-      if (!company?.codeCVM) continue;
+    for (const year of years) {
+      const freCompanies = await readFreCompanies(year);
+      const freCapitalRows = await readFreCapitalRows(year);
 
-      capitalByCodeCVM.set(company.codeCVM, capital);
+      const freCompanyByCnpj = new Map(
+        freCompanies.map((company) => [company.cnpj, company])
+      );
+
+      for (const capital of freCapitalRows) {
+        const company = freCompanyByCnpj.get(capital.cnpj);
+        if (!company?.codeCVM) continue;
+
+        // Years are processed newest first, so keep first match only.
+        if (!capitalByCodeCVM.has(company.codeCVM)) {
+          capitalByCodeCVM.set(company.codeCVM, capital);
+          freYearsUsed.add(year);
+        }
+      }
     }
 
     const securitiesByCodeCVM = groupSecuritiesByCodeCVM(securities);
@@ -394,6 +439,7 @@ export async function POST() {
         codeCVM,
         tradingName: companySecurities[0]?.tradingName ?? "",
         status: rows.length > 0 ? "imported" : "review",
+        freYear: capital.year,
         capital: {
           ordinaryShares: capital.ordinaryShares,
           preferredShares: capital.preferredShares,
@@ -412,7 +458,8 @@ export async function POST() {
       source: "cvm_fre_capital_social",
       market: "b3",
       updatedAt: now,
-      freYear: 2026,
+      freYearsAvailable: years,
+      freYearsUsed: Array.from(freYearsUsed).sort((a, b) => b - a),
       count: shares.length,
       importedCount: importedRows.length,
       reviewedCompanies: reports.length,
@@ -434,13 +481,9 @@ export async function POST() {
       {
         error: "Could not import shares from CVM FRE capital social data",
         details: error instanceof Error ? error.message : String(error),
-        expectedFiles: [
-          "data/markets/b3/cvm/fre/extracted/2026/fre_cia_aberta_2026.csv",
-          "data/markets/b3/cvm/fre/extracted/2026/fre_cia_aberta_capital_social_2026.csv",
-        ],
+        expectedFolder: "data/markets/b3/cvm/fre/extracted",
       },
       { status: 500 }
     );
   }
 }
-
