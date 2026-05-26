@@ -103,8 +103,12 @@ export async function GET() {
       .map((item) => item.ticker)
   );
 
-  const companiesWithFundamentals = new Set(
+  const allCompaniesWithFundamentals = new Set(
     fundamentals.map((item) => item.codeCVM)
+  );
+
+  const companiesWithFundamentals = new Set(
+    companyCodes.filter((codeCVM) => allCompaniesWithFundamentals.has(codeCVM))
   );
 
   const valuedCompanies = new Set(
@@ -166,6 +170,7 @@ export async function GET() {
       pricedSecurities: pricedTickers.size,
       securitiesWithShares: tickersWithShares.size,
       companiesWithFundamentals: companiesWithFundamentals.size,
+      totalCompaniesWithFundamentalsInDfpCache: allCompaniesWithFundamentals.size,
       valuedCompanies: valuedCompanies.size,
       companiesWithIrChecks: companiesWithIrChecks.size,
     },
@@ -200,3 +205,4 @@ export async function GET() {
 
   return NextResponse.json(payload);
 }
+
