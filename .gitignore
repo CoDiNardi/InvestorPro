@@ -34,3 +34,9 @@ data/markets/b3/import/COTAHIST.txt
 
 # large local B3 import files
 data/markets/b3/import/COTAHIST.txt
+
+# local CVM datasets
+data/markets/b3/cvm/
+
+# large local B3 import files
+data/markets/b3/import/COTAHIST.txt
