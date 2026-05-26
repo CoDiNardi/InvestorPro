@@ -137,6 +137,28 @@ type ValuationsResponse = {
   valuations: ValuationRow[];
 };
 
+type IrCheckRow = {
+  market: string;
+  codeCVM: string;
+  year: number;
+  metric: string;
+  cvmValue: number | null;
+  irValue: number | null;
+  difference: number | null;
+  differencePct: number | null;
+  status: string;
+  sourceUrl: string;
+  notes: string;
+};
+
+type IrChecksResponse = {
+  source: string;
+  market: string;
+  updatedAt: string | null;
+  count: number;
+  checks: IrCheckRow[];
+};
+
 const LIKELY_OPERATING_COMPANY_MARKET_INDICATORS = ["16", "17", "18"];
 
 const MARKET_LABELS: Record<string, string> = {
@@ -216,6 +238,28 @@ function formatModelName(value?: string) {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
+function formatIrStatus(value?: string) {
+  if (!value) return "Not checked";
+
+  const labels: Record<string, string> = {
+    not_checked: "Not checked",
+    ok: "OK",
+    minor_difference: "Minor difference",
+    review: "Review",
+    conflict: "Conflict",
+  };
+
+  return labels[value] ?? value;
+}
+
+function getIrStatusClass(value?: string) {
+  if (value === "ok") return "text-emerald-300";
+  if (value === "minor_difference") return "text-yellow-300";
+  if (value === "review") return "text-orange-300";
+  if (value === "conflict") return "text-red-300";
+  return "text-slate-500";
+}
+
 function uniqueCompanyValues(companies: Company[], key: keyof Company) {
   return Array.from(
     new Set(
@@ -244,6 +288,7 @@ export default function Home() {
   const [securities, setSecurities] = useState<Security[]>([]);
   const [prices, setPrices] = useState<PriceRow[]>([]);
   const [valuations, setValuations] = useState<ValuationRow[]>([]);
+  const [irChecks, setIrChecks] = useState<IrCheckRow[]>([]);
 
   const [companiesUpdatedAt, setCompaniesUpdatedAt] = useState<string | null>(
     null
@@ -254,6 +299,9 @@ export default function Home() {
   );
   const [pricesUpdatedAt, setPricesUpdatedAt] = useState<string | null>(null);
   const [valuationsUpdatedAt, setValuationsUpdatedAt] = useState<string | null>(
+    null
+  );
+  const [irChecksUpdatedAt, setIrChecksUpdatedAt] = useState<string | null>(
     null
   );
 
@@ -340,6 +388,19 @@ export default function Home() {
     setValuationsUpdatedAt(data.updatedAt ?? null);
   }
 
+  async function loadIrChecks() {
+    const response = await fetch("/api/markets/b3/ir-checks", {
+      cache: "no-store",
+    });
+
+    if (!response.ok) throw new Error("Failed to load local B3 IR checks");
+
+    const data: IrChecksResponse = await response.json();
+
+    setIrChecks(data.checks ?? []);
+    setIrChecksUpdatedAt(data.updatedAt ?? null);
+  }
+
   async function updateCompanies() {
     try {
       setUpdatingCompanies(true);
@@ -422,7 +483,7 @@ export default function Home() {
     async function start() {
       try {
         setError("");
-        await Promise.all([loadCompanies(), loadCompanyDetails(), loadSecurities(), loadPrices(), loadValuations()]);
+        await Promise.all([loadCompanies(), loadCompanyDetails(), loadSecurities(), loadPrices(), loadValuations(), loadIrChecks()]);
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
       } finally {
@@ -494,6 +555,20 @@ export default function Home() {
   const pricedSecuritiesCount = useMemo(() => {
     return prices.filter((item) => typeof item.price === "number").length;
   }, [prices]);
+
+  const latestIrCheckByCodeCVM = useMemo(() => {
+    const map = new Map<string, IrCheckRow>();
+
+    for (const check of irChecks) {
+      const existing = map.get(check.codeCVM);
+
+      if (!existing || check.year > existing.year) {
+        map.set(check.codeCVM, check);
+      }
+    }
+
+    return map;
+  }, [irChecks]);
 
   const valuationsByCodeCVM = useMemo(() => {
     const map = new Map<string, ValuationRow>();
@@ -579,6 +654,7 @@ export default function Home() {
     return securities
       .filter((security) => {
       const valuation = valuationsByCodeCVM.get(security.codeCVM);
+                  const irCheck = latestIrCheckByCodeCVM.get(security.codeCVM);
 
       const matchesQuery =
         !q ||
@@ -896,7 +972,7 @@ export default function Home() {
             </div>
           </details>
         </section>
-        <section className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-7">
+        <section className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-8">
           <div className="rounded-xl border border-slate-700 bg-slate-900 p-4">
             <p className="text-sm text-slate-400">Universe last update</p>
             <p className="mt-1 font-medium">
@@ -954,6 +1030,14 @@ export default function Home() {
             <p className="mt-1 font-medium">{valuedCompaniesCount}</p>
             <p className="mt-1 text-sm text-slate-500">
               {formatTimeSince(valuationsUpdatedAt, now)}
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-slate-700 bg-slate-900 p-4">
+            <p className="text-sm text-slate-400">IR checks</p>
+            <p className="mt-1 font-medium">{irChecks.length}</p>
+            <p className="mt-1 text-sm text-slate-500">
+              {formatTimeSince(irChecksUpdatedAt, now)}
             </p>
           </div>
         </section>
@@ -1044,8 +1128,8 @@ export default function Home() {
         )}
 
         {!loading && !error && viewMode === "securities" && (
-          <div className="investorpro-table-wrapper rounded-xl border border-slate-700 bg-slate-900">
-            <table className="investorpro-table w-full min-w-[1900px] text-sm">
+          <div className="investorpro-table-wrapper investorpro-securities-wrapper rounded-xl border border-slate-700 bg-slate-900">
+            <table className="investorpro-table w-full min-w-[2050px] text-sm">
               <thead className="bg-slate-800 text-slate-300">
                 <tr>
                   <th className="p-3 text-left">Ticker</th>
@@ -1061,6 +1145,7 @@ export default function Home() {
                   <th className="p-3 text-left">Linear PV</th>
                   <th className="p-3 text-left">Exponential PV</th>
                   <th className="p-3 text-left">Cyclical PV</th>
+                  <th className="p-3 text-left">IR Check</th>
                   <th className="p-3 text-left">Company</th>
                   <th className="p-3 text-left">Trading Name</th>
                   <th className="p-3 text-left">ISIN</th>
@@ -1077,6 +1162,7 @@ export default function Home() {
                   const websiteUrl = normalizeWebsiteUrl(security.website);
                   const priceRow = pricesByTicker.get(security.ticker);
                   const valuation = valuationsByCodeCVM.get(security.codeCVM);
+                  const irCheck = latestIrCheckByCodeCVM.get(security.codeCVM);
 
                   return (
                     <tr
@@ -1131,6 +1217,21 @@ export default function Home() {
                       <td className="p-3 text-slate-400">
                         {formatRatio(valuation?.cyclicalPvRatio)}
                       </td>
+                      <td className={`p-3 font-semibold ${getIrStatusClass(irCheck?.status)}`}>
+                        {irCheck?.sourceUrl ? (
+                          <a
+                            href={irCheck.sourceUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="hover:underline"
+                            title={irCheck.notes || ""}
+                          >
+                            {formatIrStatus(irCheck.status)}
+                          </a>
+                        ) : (
+                          formatIrStatus(irCheck?.status)
+                        )}
+                      </td>
                       <td className="p-3">{security.companyName}</td>
                       <td className="p-3">{security.tradingName}</td>
                       <td className="p-3 text-slate-400">{security.isin || "-"}</td>
@@ -1163,6 +1264,16 @@ export default function Home() {
     </main>
   );
 }
+
+
+
+
+
+
+
+
+
+
 
 
 

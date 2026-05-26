@@ -42,3 +42,85 @@ body {
   z-index: 30;
   background: #1e293b;
 }
+
+/* Compact default securities table */
+.investorpro-securities-wrapper table {
+  min-width: 1150px;
+}
+
+/*
+Securities table column map:
+1 Ticker
+2 Share Class
+3 Price
+4 Currency
+5 PV Ratio
+6 EV PV Ratio
+7 Market Cap
+8 Model
+9 Confidence
+10 Stable PV
+11 Linear PV
+12 Exponential PV
+13 Cyclical PV
+14 IR Check
+15 Company
+16 Trading Name
+17 ISIN
+18 Main Ticker
+19 Website
+20 Quotation
+21 Market
+22 Segment
+*/
+
+.investorpro-securities-wrapper th:nth-child(4),
+.investorpro-securities-wrapper td:nth-child(4),
+.investorpro-securities-wrapper th:nth-child(7),
+.investorpro-securities-wrapper td:nth-child(7),
+.investorpro-securities-wrapper th:nth-child(10),
+.investorpro-securities-wrapper td:nth-child(10),
+.investorpro-securities-wrapper th:nth-child(11),
+.investorpro-securities-wrapper td:nth-child(11),
+.investorpro-securities-wrapper th:nth-child(12),
+.investorpro-securities-wrapper td:nth-child(12),
+.investorpro-securities-wrapper th:nth-child(13),
+.investorpro-securities-wrapper td:nth-child(13),
+.investorpro-securities-wrapper th:nth-child(16),
+.investorpro-securities-wrapper td:nth-child(16),
+.investorpro-securities-wrapper th:nth-child(17),
+.investorpro-securities-wrapper td:nth-child(17),
+.investorpro-securities-wrapper th:nth-child(18),
+.investorpro-securities-wrapper td:nth-child(18),
+.investorpro-securities-wrapper th:nth-child(19),
+.investorpro-securities-wrapper td:nth-child(19),
+.investorpro-securities-wrapper th:nth-child(20),
+.investorpro-securities-wrapper td:nth-child(20),
+.investorpro-securities-wrapper th:nth-child(21),
+.investorpro-securities-wrapper td:nth-child(21) {
+  display: none;
+}
+
+/* Dark scrollbar for InvestorPro data tables */
+.investorpro-table-wrapper {
+  scrollbar-width: thin;
+  scrollbar-color: #475569 #0f172a;
+}
+
+.investorpro-table-wrapper::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.investorpro-table-wrapper::-webkit-scrollbar-track {
+  background: #0f172a;
+}
+
+.investorpro-table-wrapper::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 999px;
+}
+
+.investorpro-table-wrapper::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
