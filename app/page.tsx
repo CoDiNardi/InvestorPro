@@ -123,6 +123,7 @@ type ValuationRow = {
   marketCap?: number;
   enterpriseValue?: number;
   pvOperatingCashFlow?: number;
+  latestOperatingCashFlow?: number;
   pvRatio?: number;
   evAdjustedPvRatio?: number;
 };
@@ -996,7 +997,7 @@ export default function Home() {
           <div className="grid gap-4 xl:grid-cols-[1fr_auto_auto]">
             <div className="rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-slate-300">
               {activeCount} / {activeDenominator}{" "}
-              {viewMode === "issuers" ? "records" : "securities"}
+              {viewMode === "issuers" ? "records" : viewMode === "securities" ? "securities" : "companies"}
             </div>
 
             {viewMode === "issuers" && (
@@ -1367,6 +1368,7 @@ export default function Home() {
                   <th className="p-3 text-left">Market Cap</th>
                   <th className="p-3 text-left">Enterprise Value</th>
                   <th className="p-3 text-left">Latest OCF</th>
+                  <th className="p-3 text-left">PV of OCF</th>
                 </tr>
               </thead>
 
@@ -1432,6 +1434,14 @@ export default function Home() {
                       </td>
 
                       <td className="p-3 text-slate-400">
+                        {typeof valuation.latestOperatingCashFlow === "number"
+                          ? valuation.latestOperatingCashFlow.toLocaleString("en-US", {
+                              maximumFractionDigits: 0,
+                            })
+                          : "-"}
+                      </td>
+
+                      <td className="p-3 text-slate-400">
                         {typeof valuation.pvOperatingCashFlow === "number"
                           ? valuation.pvOperatingCashFlow.toLocaleString("en-US", {
                               maximumFractionDigits: 0,
@@ -1449,6 +1459,7 @@ export default function Home() {
     </main>
   );
 }
+
 
 
 
