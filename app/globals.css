@@ -124,3 +124,27 @@ Securities table column map:
 .investorpro-table-wrapper::-webkit-scrollbar-thumb:hover {
   background: #64748b;
 }
+
+/* Dark scrollbar for InvestorPro data tables */
+.investorpro-table-wrapper {
+  scrollbar-width: thin;
+  scrollbar-color: #475569 #0f172a;
+}
+
+.investorpro-table-wrapper::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.investorpro-table-wrapper::-webkit-scrollbar-track {
+  background: #0f172a;
+}
+
+.investorpro-table-wrapper::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 999px;
+}
+
+.investorpro-table-wrapper::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
