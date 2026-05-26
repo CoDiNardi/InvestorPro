@@ -28,3 +28,6 @@ data/markets/*/import/*.csv
 
 # keep example CSV templates
 !data/markets/*/import/*.example.csv
+
+# large local B3 import files
+data/markets/b3/import/COTAHIST.txt
