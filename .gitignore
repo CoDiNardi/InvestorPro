@@ -31,3 +31,6 @@ data/markets/*/import/*.csv
 
 # large local B3 import files
 data/markets/b3/import/COTAHIST.txt
+
+# large local B3 import files
+data/markets/b3/import/COTAHIST.txt
