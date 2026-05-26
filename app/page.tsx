@@ -160,6 +160,29 @@ type IrChecksResponse = {
   checks: IrCheckRow[];
 };
 
+type CoverageResponse = {
+  source: string;
+  market: string;
+  updatedAt: string;
+  totals: {
+    securities: number;
+    companies: number;
+  };
+  coverage: {
+    pricedSecurities: number;
+    securitiesWithShares: number;
+    companiesWithFundamentals: number;
+    valuedCompanies: number;
+    companiesWithIrChecks: number;
+  };
+  missing: {
+    prices: number;
+    shares: number;
+    fundamentals: number;
+    irChecks: number;
+  };
+};
+
 const LIKELY_OPERATING_COMPANY_MARKET_INDICATORS = ["16", "17", "18"];
 
 const MARKET_LABELS: Record<string, string> = {
@@ -290,6 +313,7 @@ export default function Home() {
   const [prices, setPrices] = useState<PriceRow[]>([]);
   const [valuations, setValuations] = useState<ValuationRow[]>([]);
   const [irChecks, setIrChecks] = useState<IrCheckRow[]>([]);
+  const [coverage, setCoverage] = useState<CoverageResponse | null>(null);
 
   const [companiesUpdatedAt, setCompaniesUpdatedAt] = useState<string | null>(
     null
@@ -402,6 +426,18 @@ export default function Home() {
     setIrChecksUpdatedAt(data.updatedAt ?? null);
   }
 
+  async function loadCoverage() {
+    const response = await fetch("/api/markets/b3/coverage", {
+      cache: "no-store",
+    });
+
+    if (!response.ok) throw new Error("Failed to load B3 coverage diagnostics");
+
+    const data: CoverageResponse = await response.json();
+
+    setCoverage(data);
+  }
+
   async function updateCompanies() {
     try {
       setUpdatingCompanies(true);
@@ -484,7 +520,7 @@ export default function Home() {
     async function start() {
       try {
         setError("");
-        await Promise.all([loadCompanies(), loadCompanyDetails(), loadSecurities(), loadPrices(), loadValuations(), loadIrChecks()]);
+        await Promise.all([loadCompanies(), loadCompanyDetails(), loadSecurities(), loadPrices(), loadValuations(), loadIrChecks(), loadCoverage()]);
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
       } finally {
@@ -1065,6 +1101,67 @@ export default function Home() {
             </div>
           </details>
         </section>
+                {coverage && (
+          <section className="mb-6 rounded-xl border border-slate-700 bg-slate-900 p-4">
+            <div className="mb-4">
+              <h2 className="text-lg font-bold text-slate-100">
+                Coverage Diagnostics
+              </h2>
+              <p className="mt-1 text-sm text-slate-400">
+                Shows which data layers are still missing before companies can be valued.
+              </p>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+              <div className="rounded-xl border border-slate-700 bg-slate-950 p-4">
+                <p className="text-sm text-slate-400">Prices</p>
+                <p className="mt-1 font-semibold">
+                  {coverage.coverage.pricedSecurities} / {coverage.totals.securities}
+                </p>
+                <p className="mt-1 text-sm text-slate-500">
+                  Missing {coverage.missing.prices}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-slate-700 bg-slate-950 p-4">
+                <p className="text-sm text-slate-400">Shares</p>
+                <p className="mt-1 font-semibold">
+                  {coverage.coverage.securitiesWithShares} / {coverage.totals.securities}
+                </p>
+                <p className="mt-1 text-sm text-slate-500">
+                  Missing {coverage.missing.shares}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-slate-700 bg-slate-950 p-4">
+                <p className="text-sm text-slate-400">Fundamentals</p>
+                <p className="mt-1 font-semibold">
+                  {coverage.coverage.companiesWithFundamentals} / {coverage.totals.companies}
+                </p>
+                <p className="mt-1 text-sm text-slate-500">
+                  Missing {coverage.missing.fundamentals}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-slate-700 bg-slate-950 p-4">
+                <p className="text-sm text-slate-400">Valuations</p>
+                <p className="mt-1 font-semibold">
+                  {coverage.coverage.valuedCompanies} / {coverage.totals.companies}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-slate-700 bg-slate-950 p-4">
+                <p className="text-sm text-slate-400">IR checks</p>
+                <p className="mt-1 font-semibold">
+                  {coverage.coverage.companiesWithIrChecks} / {coverage.totals.companies}
+                </p>
+                <p className="mt-1 text-sm text-slate-500">
+                  Missing {coverage.missing.irChecks}
+                </p>
+              </div>
+            </div>
+          </section>
+        )}
         <section className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-8">
           <div className="rounded-xl border border-slate-700 bg-slate-900 p-4">
             <p className="text-sm text-slate-400">Universe last update</p>
@@ -1459,6 +1556,11 @@ export default function Home() {
     </main>
   );
 }
+
+
+
+
+
 
 
 
