@@ -172,6 +172,7 @@ type CoverageResponse = {
     pricedSecurities: number;
     securitiesWithShares: number;
     companiesWithFundamentals: number;
+    totalCompaniesWithFundamentalsInDfpCache?: number;
     valuedCompanies: number;
     companiesWithIrChecks: number;
   };
@@ -1296,6 +1297,11 @@ export default function Home() {
                 <p className="mt-1 text-sm text-slate-500">
                   Missing {coverage.missing.fundamentals}
                 </p>
+                {"totalCompaniesWithFundamentalsInDfpCache" in coverage.coverage && (
+                  <p className="mt-1 text-xs text-slate-500">
+                    DFP cache: {coverage.coverage.totalCompaniesWithFundamentalsInDfpCache} companies
+                  </p>
+                )}
               </div>
 
               <div className="rounded-xl border border-slate-700 bg-slate-950 p-4">
@@ -1711,6 +1717,8 @@ export default function Home() {
     </main>
   );
 }
+
+
 
 
 
