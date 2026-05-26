@@ -281,7 +281,7 @@ function uniqueSecurityValues(securities: Security[], key: keyof Security) {
 }
 
 export default function Home() {
-  const [viewMode, setViewMode] = useState<"issuers" | "securities">("securities");
+  const [viewMode, setViewMode] = useState<"issuers" | "securities" | "valuations">("securities");
 
   const [companies, setCompanies] = useState<Company[]>([]);
   const [details, setDetails] = useState<CompanyDetailRecord[]>([]);
@@ -723,6 +723,58 @@ export default function Home() {
       });
   }, [securities, query, segmentFilter, shareClassFilter, valuedOnly, sortMode, pricesByTicker, valuationsByCodeCVM]);
 
+  const filteredValuations = useMemo(() => {
+    const q = query.toLowerCase().trim();
+
+    return valuations
+      .filter((valuation) => {
+        if (valuation.status !== "valued") return false;
+
+        const irCheck = latestIrCheckByCodeCVM.get(valuation.codeCVM);
+
+        const matchesQuery =
+          !q ||
+          [
+            valuation.codeCVM,
+            valuation.companyName,
+            valuation.tradingName,
+            valuation.model,
+            valuation.selectedModel,
+            valuation.confidence,
+            irCheck?.status,
+          ]
+            .join(" ")
+            .toLowerCase()
+            .includes(q);
+
+        const matchesValuedOnly = !valuedOnly || valuation.status === "valued";
+
+        return matchesQuery && matchesValuedOnly;
+      })
+      .sort((a, b) => {
+        if (sortMode === "ev_pv_desc") {
+          return (
+            (b.evAdjustedPvRatio ?? -Infinity) -
+            (a.evAdjustedPvRatio ?? -Infinity)
+          );
+        }
+
+        if (sortMode === "ticker_asc") {
+          return String(a.tradingName ?? "").localeCompare(
+            String(b.tradingName ?? "")
+          );
+        }
+
+        return (b.pvRatio ?? -Infinity) - (a.pvRatio ?? -Infinity);
+      });
+  }, [
+    valuations,
+    query,
+    valuedOnly,
+    sortMode,
+    latestIrCheckByCodeCVM,
+  ]);
+
   const hasActiveFilters =
     query ||
     segmentFilter ||
@@ -739,10 +791,16 @@ export default function Home() {
       ? likelyOperatingCompaniesOnly
         ? likelyOperatingCompaniesCount
         : companies.length
-      : securities.length;
+      : viewMode === "securities"
+        ? securities.length
+        : valuations.filter((item) => item.status === "valued").length;
 
   const activeCount =
-    viewMode === "issuers" ? filteredCompanies.length : filteredSecurities.length;
+    viewMode === "issuers"
+      ? filteredCompanies.length
+      : viewMode === "securities"
+        ? filteredSecurities.length
+        : filteredValuations.length;
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100 p-8">
@@ -760,7 +818,7 @@ export default function Home() {
         </header>
 
         <section className="mb-6 grid gap-4">
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-3">
             <button
               onClick={() => setViewMode("issuers")}
               className={`rounded-xl px-5 py-3 font-semibold ${
@@ -781,6 +839,17 @@ export default function Home() {
               }`}
             >
               Investable Securities
+            </button>
+
+            <button
+              onClick={() => setViewMode("valuations")}
+              className={`rounded-xl px-5 py-3 font-semibold ${
+                viewMode === "valuations"
+                  ? "bg-blue-600 text-white"
+                  : "border border-slate-700 bg-slate-900 text-slate-100 hover:bg-slate-800"
+              }`}
+            >
+              Valuation Ranking
             </button>
           </div>
 
@@ -897,6 +966,29 @@ export default function Home() {
                 <option value="ev_pv_desc">Highest EV PV Ratio</option>
                 <option value="price_desc">Highest Price</option>
                 <option value="price_asc">Lowest Price</option>
+              </select>
+            </div>
+          )}
+
+          {viewMode === "valuations" && (
+            <div className="grid gap-4 md:grid-cols-2">
+              <select
+                value={sortMode}
+                onChange={(event) => setSortMode(event.target.value)}
+                className="rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 outline-none focus:border-blue-500"
+              >
+                <option value="pv_desc">Highest PV Ratio</option>
+                <option value="ev_pv_desc">Highest EV PV Ratio</option>
+                <option value="ticker_asc">Company A-Z</option>
+              </select>
+
+              <select
+                value={valuedOnly ? "valued" : "all"}
+                onChange={(event) => setValuedOnly(event.target.value === "valued")}
+                className="rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 outline-none focus:border-blue-500"
+              >
+                <option value="all">All valued companies</option>
+                <option value="valued">Valued only</option>
               </select>
             </div>
           )}
@@ -1260,10 +1352,109 @@ export default function Home() {
             </table>
           </div>
         )}
+
+        {!loading && !error && viewMode === "valuations" && (
+          <div className="investorpro-table-wrapper rounded-xl border border-slate-700 bg-slate-900">
+            <table className="investorpro-table w-full min-w-[1300px] text-sm">
+              <thead className="bg-slate-800 text-slate-300">
+                <tr>
+                  <th className="p-3 text-left">Company</th>
+                  <th className="p-3 text-left">PV Ratio</th>
+                  <th className="p-3 text-left">EV PV Ratio</th>
+                  <th className="p-3 text-left">Model</th>
+                  <th className="p-3 text-left">Confidence</th>
+                  <th className="p-3 text-left">IR Check</th>
+                  <th className="p-3 text-left">Market Cap</th>
+                  <th className="p-3 text-left">Enterprise Value</th>
+                  <th className="p-3 text-left">Latest OCF</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {filteredValuations.map((valuation) => {
+                  const irCheck = latestIrCheckByCodeCVM.get(valuation.codeCVM);
+
+                  return (
+                    <tr
+                      key={valuation.codeCVM}
+                      className="border-t border-slate-800 hover:bg-slate-800/60"
+                    >
+                      <td className="p-3 font-semibold">
+                        {valuation.tradingName || valuation.companyName || valuation.codeCVM}
+                      </td>
+
+                      <td className="p-3 font-bold text-slate-100">
+                        {formatRatio(valuation.pvRatio)}
+                      </td>
+
+                      <td className="p-3 text-slate-300">
+                        {formatRatio(valuation.evAdjustedPvRatio)}
+                      </td>
+
+                      <td className="p-3 text-slate-300">
+                        {formatModelName(valuation.selectedModel || valuation.model)}
+                      </td>
+
+                      <td className="p-3 text-slate-400">
+                        {valuation.confidence || "-"}
+                      </td>
+
+                      <td className={`p-3 font-semibold ${getIrStatusClass(irCheck?.status)}`}>
+                        {irCheck?.sourceUrl ? (
+                          <a
+                            href={irCheck.sourceUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="hover:underline"
+                            title={irCheck.notes || ""}
+                          >
+                            {formatIrStatus(irCheck.status)}
+                          </a>
+                        ) : (
+                          formatIrStatus(irCheck?.status)
+                        )}
+                      </td>
+
+                      <td className="p-3 text-slate-400">
+                        {typeof valuation.marketCap === "number"
+                          ? valuation.marketCap.toLocaleString("en-US", {
+                              maximumFractionDigits: 0,
+                            })
+                          : "-"}
+                      </td>
+
+                      <td className="p-3 text-slate-400">
+                        {typeof valuation.enterpriseValue === "number"
+                          ? valuation.enterpriseValue.toLocaleString("en-US", {
+                              maximumFractionDigits: 0,
+                            })
+                          : "-"}
+                      </td>
+
+                      <td className="p-3 text-slate-400">
+                        {typeof valuation.pvOperatingCashFlow === "number"
+                          ? valuation.pvOperatingCashFlow.toLocaleString("en-US", {
+                              maximumFractionDigits: 0,
+                            })
+                          : "-"}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </main>
   );
 }
+
+
+
+
+
+
 
 
 
