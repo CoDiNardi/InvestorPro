@@ -345,6 +345,8 @@ export default function Home() {
   const [updatingCompanies, setUpdatingCompanies] = useState(false);
   const [updatingDetails, setUpdatingDetails] = useState(false);
   const [updatingSecurities, setUpdatingSecurities] = useState(false);
+  const [importingCotahistPrices, setImportingCotahistPrices] = useState(false);
+  const [recalculatingValuations, setRecalculatingValuations] = useState(false);
   const [error, setError] = useState("");
   const [now, setNow] = useState(new Date());
 
@@ -495,6 +497,50 @@ export default function Home() {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setUpdatingSecurities(false);
+    }
+  }
+
+  async function importCotahistPrices() {
+    try {
+      setImportingCotahistPrices(true);
+      setError("");
+
+      const response = await fetch("/api/markets/b3/prices/import-cotahist", {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to import B3 COTAHIST prices");
+      }
+
+      await Promise.all([loadPrices(), loadCoverage()]);
+      setNow(new Date());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setImportingCotahistPrices(false);
+    }
+  }
+
+  async function recalculateValuations() {
+    try {
+      setRecalculatingValuations(true);
+      setError("");
+
+      const response = await fetch("/api/markets/b3/valuations/update", {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to recalculate B3 valuations");
+      }
+
+      await Promise.all([loadValuations(), loadCoverage()]);
+      setNow(new Date());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRecalculatingValuations(false);
     }
   }
 
@@ -1074,7 +1120,7 @@ export default function Home() {
               Prices from CSV are imported automatically when the app loads prices.
             </p>
 
-            <div className="mt-4 grid gap-4 md:grid-cols-3">
+            <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
               <button
                 onClick={updateCompanies}
                 disabled={updatingCompanies}
@@ -1097,6 +1143,26 @@ export default function Home() {
                 className="rounded-xl bg-purple-600 px-5 py-3 font-semibold text-white hover:bg-purple-500 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {updatingSecurities ? "Updating securities..." : "Update securities"}
+              </button>
+
+              <button
+                onClick={importCotahistPrices}
+                disabled={importingCotahistPrices}
+                className="rounded-xl bg-amber-600 px-5 py-3 font-semibold text-white hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {importingCotahistPrices
+                  ? "Importing COTAHIST..."
+                  : "Import COTAHIST prices"}
+              </button>
+
+              <button
+                onClick={recalculateValuations}
+                disabled={recalculatingValuations}
+                className="rounded-xl bg-emerald-600 px-5 py-3 font-semibold text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {recalculatingValuations
+                  ? "Recalculating valuations..."
+                  : "Recalculate valuations"}
               </button>
             </div>
           </details>
@@ -1579,6 +1645,10 @@ export default function Home() {
     </main>
   );
 }
+
+
+
+
 
 
 
